@@ -17,8 +17,8 @@
 <div class="intro"><div><h2>曲げて、跳ねて、狙い撃ち。</h2><p class="muted">ターゲットを置いて、選手ごとのサーブを打ち分けよう。</p></div><div class="stats"><div><strong id="score">0</strong><small>POINTS</small></div><div><strong id="hits">0 / 0</strong><small>TARGET HITS</small></div></div></div>
 <div class="player-picker"><label for="player">🎾 サーバー</label><select id="player"><option value="nobichan">nobichan（右利き・8球種）</option><option value="tt">t.tおやじさん（左利き・3球種）</option></select></div>
 <div class="layout"><section class="play-area" aria-label="コートとサーブ操作">
-<div class="court"><div class="badge">● 点線内をタップ／ドラッグしてターゲットを配置</div><canvas id="c" width="850" height="690" aria-label="相手側サービスボックスにターゲットを設置できます"></canvas></div>
-<div class="serve-controls"><p style="font-size:12px;color:#acbfc2">中央の明るいゾーンでインパクト！</p><div class="meter"><i class="needle" id="needle"></i></div><button id="serve">トスを上げる [ Space ]</button><div id="msg" role="status" aria-live="polite">ターゲットはドラッグでも動かせます。</div></div>
+<div class="court"><div class="badge">● 青いリターナー／点線内のターゲットをドラッグ</div><canvas id="c" width="850" height="690" tabindex="0" aria-label="青いリターナーはドラッグで移動できます。矢印キーでも移動。相手側サービスボックスにターゲットを設置できます"></canvas></div>
+<div class="serve-controls"><p style="font-size:12px;color:#acbfc2">中央の明るいゾーンでインパクト！</p><div class="meter"><i class="needle" id="needle"></i></div><button id="serve">トスを上げる [ Space ]</button><div id="msg" role="status" aria-live="polite">青いリターナーをドラッグで自由に移動できます。</div></div>
 </section>
 <aside class="panel"><p class="label">01 / SERVE TYPE</p><div class="shots" id="shots"></div><div class="controls"><p class="label">02 / SERVICE SIDE</p><select id="side" aria-label="サーブを打つサイド"><option value="deuce">デュースサイド（右側から）</option><option value="ad">アドサイド（左側から）</option></select></div>
 <div class="presets" aria-label="ターゲットの配置"><button type="button" data-aim="center">センター</button><button type="button" data-aim="wide">ワイド</button><button type="button" data-aim="angle">アングル</button></div>
@@ -26,7 +26,7 @@
 <div class="controls"><label class="label" for="skills">03 / 得意技・メモ（編集できます）</label><textarea class="skills" id="skills" aria-describedby="save-status"></textarea><p class="note" id="save-status" role="status">選手ごとに記入できます。</p></div>
 <label class="guide"><input type="checkbox" id="guide" checked> サーバーと着地点の延長線を表示</label>
 <p class="note">フラットとスピンは、サーバーから着地点へ向かう線の延長方向にバウンドします。スピンは高さが変わります。スライスとキックの角度もこの方向が基準です。90°は誇張表現で、厳密な物理シミュレーターではありません。</p></aside></div>
-<footer><span>① ターゲット配置　② 球種選択　③ トス → もう一度押す</span><span><button id="reset">スコアをリセット</button>　<a id="download" href="#">HTMLを保存 ↓</a></span></footer>
+<footer><span>青いリターナーはドラッグで移動 ／ ターゲット配置 → 球種選択 → トス → もう一度押す</span><span><button id="reset">スコアをリセット</button>　<a id="download" href="#">HTMLを保存 ↓</a></span></footer>
 </main>
 <script>
 'use strict';
@@ -48,12 +48,15 @@ const profiles={
   {n:'スピン',a:0,v:140,col:'#a8ded8',spin:true}
  ]}
 };
+const initialReceiver = {x:300,y:110};
+let receiver={...initialReceiver};
+let dragMode=null,activePointer=null,dragOffset={x:0,y:0};
 const embeddedNotes = {};
 let playerId=document.documentElement.dataset.player==='tt'?'tt':'nobichan';
 let types=profiles[playerId].types;
 function profile(){return profiles[playerId];}
 function durationFor(type){return type.fast?(type.a===0?650:750):type.quicker?1000:1450*160/type.v;}
-let selected=1,side='deuce',target={x:300,y:240},phase='idle',start=0,needle=0.5,flight=null,trail=[],score=0,hits=0,tries=0,last=null,dragging=false;
+let selected=1,side='deuce',target={x:300,y:240},phase='idle',start=0,needle=0.5,flight=null,trail=[],score=0,hits=0,tries=0,last=null;
 side=profile().side;
 if(side==='ad')target.x=850-target.x;
 const box=()=>side==='deuce'?{l:205,r:425,t:165,b:340}:{l:425,r:645,t:165,b:340};
@@ -78,6 +81,17 @@ function pos(t){
  const u=t-1,distance=u*240;
  return {x:f.e.x+f.direction.x*distance,y:f.e.y+f.direction.y*distance,z:Math.sin(Math.PI*Math.min(u/0.85,1))*(f.type.spin?135:40)};
 }
+function drawReceiver(){
+ const {x,y}=receiver;
+ ctx.fillStyle='#071c2855';ctx.beginPath();ctx.ellipse(x,y+4,23,7,0,0,Math.PI*2);ctx.fill();
+ circ(x,y-37,11,'#8bd6ff');
+ line(x,y-25,x,y-10,'#72c8fa',7);
+ line(x,y-10,x-11,y,'#8bd6ff',5);line(x,y-10,x+11,y,'#8bd6ff',5);
+ line(x,y-21,x+21,y-18,'#8bd6ff',4);
+ ctx.strokeStyle='#b7e8ff';ctx.lineWidth=3;ctx.beginPath();ctx.ellipse(x+29,y-20,8,12,0.4,0,Math.PI*2);ctx.stroke();
+ ctx.font='bold 13px system-ui';ctx.textAlign='center';ctx.fillStyle='#c8ecff';ctx.fillText('リターナー',x,y-57);ctx.textAlign='start';
+ if(dragMode==='receiver'){ctx.setLineDash([4,4]);ctx.strokeStyle='#8bd6ff';ctx.lineWidth=2;ctx.strokeRect(x-30,y-53,70,64);ctx.setLineDash([]);}
+}
 function draw(timestamp){
  ctx.clearRect(0,0,850,690);ctx.fillStyle='#153d3d';ctx.fillRect(150,65,550,550);ctx.fillStyle='#30676a';ctx.fillRect(205,90,440,500);ctx.fillStyle='#387478';ctx.fillRect(205,165,440,350);
  for(const x of [150,205,645,700])line(x,90,x,590);
@@ -94,6 +108,7 @@ function draw(timestamp){
  ctx.strokeStyle='#d1ef8f';ctx.lineWidth=2;for(const r of [1,0.48]){ctx.beginPath();ctx.ellipse(target.x,target.y,25*r,15*r,0,0,Math.PI*2);ctx.stroke();}
  line(target.x-32,target.y,target.x+32,target.y,'#d1ef8f88',1);line(target.x,target.y-22,target.x,target.y+22,'#d1ef8f88',1);
  if(last)circ(last.x,last.y,5,last.good?'#d4ef91':'#f7a38f');
+ drawReceiver();
  if(phase==='toss'){
   needle=(Math.sin((timestamp-start)/340)+1)/2;$('#needle').style.left=needle*100+'%';
   circ(server.x+20*profile().hand,server.y-40-Math.abs(Math.sin((timestamp-start)/500))*75,6,'#e4f495');
@@ -131,12 +146,36 @@ document.addEventListener('keydown',event=>{
  event.preventDefault();serve();
 });
 $('#side').onchange=event=>{if(phase!=='idle'){event.target.value=side;return;}side=event.target.value;target.x=850-target.x;last=null;};
-function move(event){
- if(phase!=='idle')return;
- const rect=C.getBoundingClientRect(),x=(event.clientX-rect.left)*850/rect.width,y=(event.clientY-rect.top)*690/rect.height,b=box();
- if(x>=b.l&&x<=b.r&&y>=b.t&&y<=b.b)target={x,y};
+function canvasPoint(event){
+ const rect=C.getBoundingClientRect();
+ return {x:(event.clientX-rect.left)*850/rect.width,y:(event.clientY-rect.top)*690/rect.height};
 }
-C.onpointerdown=event=>{dragging=true;C.setPointerCapture(event.pointerId);move(event);};C.onpointermove=event=>{if(dragging)move(event);};C.onpointerup=C.onpointercancel=()=>{dragging=false;};
+function receiverHit(p){return p.x>=receiver.x-32&&p.x<=receiver.x+43&&p.y>=receiver.y-52&&p.y<=receiver.y+13;}
+function placeReceiver(p){receiver={x:Math.max(40,Math.min(805,p.x)),y:Math.max(75,Math.min(670,p.y))};}
+function move(event){
+ const p=canvasPoint(event);
+ if(dragMode==='receiver'){placeReceiver({x:p.x-dragOffset.x,y:p.y-dragOffset.y});return;}
+ if(phase!=='idle'||dragMode!=='target')return;
+ const b=box();if(p.x>=b.l&&p.x<=b.r&&p.y>=b.t&&p.y<=b.b)target=p;
+}
+C.onpointerdown=event=>{
+ if(activePointer!==null)return;
+ const p=canvasPoint(event);
+ if(receiverHit(p)){dragMode='receiver';dragOffset={x:p.x-receiver.x,y:p.y-receiver.y};}
+ else if(phase==='idle'){const b=box();if(p.x<b.l||p.x>b.r||p.y<b.t||p.y>b.b)return;dragMode='target';}
+ else return;
+ activePointer=event.pointerId;C.setPointerCapture(event.pointerId);C.style.cursor='grabbing';move(event);
+};
+C.onpointermove=event=>{
+ if(event.pointerId===activePointer)move(event);
+ else if(activePointer===null)C.style.cursor=receiverHit(canvasPoint(event))?'grab':'crosshair';
+};
+function endDrag(event){if(event.pointerId!==activePointer)return;activePointer=null;dragMode=null;C.style.cursor='crosshair';}
+C.onpointerup=C.onpointercancel=C.onlostpointercapture=endDrag;
+C.addEventListener('keydown',event=>{
+ const delta={ArrowLeft:[-1,0],ArrowRight:[1,0],ArrowUp:[0,-1],ArrowDown:[0,1]}[event.key];
+ if(!delta)return;event.preventDefault();const step=event.shiftKey?20:5;placeReceiver({x:receiver.x+delta[0]*step,y:receiver.y+delta[1]*step});
+});
 $('#reset').onclick=()=>{score=hits=tries=0;$('#score').textContent='0';$('#hits').textContent='0 / 0';last=null;flight=null;trail=[];phase='idle';needle=0.5;$('#needle').style.left='50%';$('#serve').textContent='トスを上げる [ Space ]';$('#msg').textContent='スコアをリセットしました。';};
 // 得意技は選手ごとに保存。ファイル保存時にも現在の記入内容を含める。
 function noteKey(){return 'serve-lab-skills-v2-'+playerId;}
@@ -174,6 +213,7 @@ $('#download').onclick=event=>{
  const copy=document.documentElement.cloneNode(true);
  const script=copy.querySelector('script');
  // < をエスケープして、メモ中のHTMLをスクリプトとして解釈させない。
+ script.textContent=script.textContent.replace(/const initialReceiver = [^\n]*;/,()=> 'const initialReceiver = '+JSON.stringify(receiver)+';');
  const encoded=JSON.stringify(notes).replace(/</g,'\\u003c');
  script.textContent=script.textContent.replace(/const embeddedNotes = [^\n]*;/,()=> 'const embeddedNotes = '+encoded+';');
  copy.querySelector('#skills').textContent=$('#skills').value;
