@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>SERVE LAB — サーブ・チャレンジ</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#101d24;color:#eef4ee;font-family:system-ui,sans-serif}header{display:flex;justify-content:space-between;align-items:center;padding:20px 4%;border-bottom:1px solid #35434a}h1{font-size:23px;margin:0;letter-spacing:3px}header span{color:#c6ed77;font-size:12px}main{max-width:1400px;margin:auto;padding:24px 4%}h2{font-size:28px;margin:0 0 8px}p{line-height:1.7;margin:6px 0}.muted,small{color:#9badb5}.intro{display:flex;justify-content:space-between;align-items:end;margin-bottom:18px}.stats{display:flex;gap:24px}.stats strong{font-size:23px;color:#cee98c}.stats small{display:block;font-size:11px}.layout{display:grid;grid-template-columns:minmax(0,1fr) 310px;gap:24px;align-items:start}.play-area{min-width:0}.court{position:relative;background:#18373c;border:1px solid #40555a;border-radius:18px;overflow:hidden}canvas{display:block;width:100%;aspect-ratio:850/690;touch-action:none;cursor:crosshair}.badge{position:absolute;top:12px;left:14px;color:#d5ecb9;font-size:11px;pointer-events:none}.panel,.serve-controls{background:#1b2a32;border:1px solid #35444c;border-radius:14px;padding:18px}.serve-controls{margin-top:10px;padding:12px 16px}.label{font-size:11px;color:#9aaeb7;letter-spacing:2px;margin-bottom:12px}.shots{display:grid;gap:7px}button,select{font:inherit}button{cursor:pointer;touch-action:manipulation}.shot{background:transparent;color:#c6d3d8;border:1px solid #42525a;border-radius:9px;padding:10px 12px;display:flex;justify-content:space-between;font-size:13px;text-align:left}.shot.active{background:#c9eb89;color:#172526;border-color:#c9eb89}.controls{margin-top:22px}select{background:#101d24;color:white;border:1px solid #52636b;border-radius:6px;padding:9px;width:100%}.meter{height:16px;background:linear-gradient(90deg,#506976 0 38%,#9cbb72 38% 46%,#d4f594 46% 54%,#9cbb72 54% 62%,#506976 62%);position:relative;border-radius:8px;margin:12px 0}.needle{position:absolute;top:-4px;width:3px;height:24px;background:white;left:50%}#serve{background:#c9eb89;border:0;border-radius:9px;width:100%;min-height:48px;padding:12px;font-weight:800;color:#182a25;font-size:16px}#msg{min-height:24px;font-size:13px;margin-top:8px;color:#d3e6bd}.note{font-size:11px;color:#9badb5;margin-top:16px}footer{display:flex;justify-content:space-between;gap:15px;margin-top:16px;font-size:12px;color:#9aadad}a{color:#c9eb89}#reset{background:none;color:#aabdbf;border:0;text-decoration:underline}label.guide{display:block;margin-top:16px;font-size:12px;color:#c6d3d8}
+@media(max-width:850px){.layout{grid-template-columns:1fr;gap:16px}.intro{display:block;margin-bottom:12px}.stats{margin-top:10px}.shots{grid-template-columns:1fr 1fr}.panel{padding:16px}h2{font-size:22px}footer{flex-direction:column}.badge{font-size:10px}canvas{width:min(100%,calc(48svh * 850 / 690));margin-inline:auto}header{padding:12px 4%}header span{font-size:10px}h1{font-size:20px}main{padding-top:14px}.serve-controls{padding:10px 12px}}
+</style>
+</head>
+<body>
+<header><h1>SERVE LAB ／ 🎾</h1><span>右利き / RIGHT-HANDED</span></header>
+<main>
+<div class="intro"><div><h2>曲げて、跳ねて、狙い撃ち。</h2><p class="muted">ターゲットを置いて、7つのサーブを打ち分けよう。</p></div><div class="stats"><div><strong id="score">0</strong><small>POINTS</small></div><div><strong id="hits">0 / 0</strong><small>TARGET HITS</small></div></div></div>
+<div class="layout"><section class="play-area" aria-label="コートとサーブ操作">
+<div class="court"><div class="badge">● 点線内をタップ／ドラッグしてターゲットを配置</div><canvas id="c" width="850" height="690" aria-label="相手側サービスボックスにターゲットを設置できます"></canvas></div>
+<div class="serve-controls"><p style="font-size:12px;color:#acbfc2">中央の明るいゾーンでインパクト！</p><div class="meter"><i class="needle" id="needle"></i></div><button id="serve">トスを上げる [ Space ]</button><div id="msg" role="status" aria-live="polite">ターゲットはドラッグでも動かせます。</div></div>
+</section>
+<aside class="panel"><p class="label">01 / SERVE TYPE</p><div class="shots" id="shots"></div><div class="controls"><p class="label">02 / SERVICE SIDE</p><select id="side" aria-label="サーブを打つサイド"><option value="deuce">デュースサイド（右側から）</option><option value="ad">アドサイド（左側から）</option></select></div>
+<label class="guide"><input type="checkbox" id="guide" checked> サーバーと着地点の延長線を表示</label>
+<p class="note">フラットとスピンは、サーバーから着地点へ向かう線の延長方向にバウンドします。スピンは高さが変わります。スライスとキックの角度もこの方向が基準です。90°は誇張表現で、厳密な物理シミュレーターではありません。</p></aside></div>
+<footer><span>① ターゲット配置　② 球種選択　③ トス → もう一度押す</span><span><button id="reset">スコアをリセット</button>　<a id="download" href="#">HTMLを保存 ↓</a></span></footer>
+</main>
+<script>
+'use strict';
+const C=document.querySelector('#c'),ctx=C.getContext('2d'),$=s=>document.querySelector(s);
+const types=[
+ {n:'スライス',a:90,v:125,col:'#e5c37f'},
+ {n:'スライス',a:45,v:145,col:'#e5c37f'},
+ {n:'スライス',a:10,v:160,col:'#e5c37f'},
+ {n:'跳ねるスピン',a:0,v:140,col:'#a8ded8',spin:true},
+ {n:'高速スライス',a:30,v:190,col:'#e5c37f'},
+ {n:'逆キック',a:-10,v:155,col:'#bca9e6',spin:true},
+ {n:'高速フラット',a:0,v:215,col:'#edaa9d'}
+];
+let selected=1,side='deuce',target={x:300,y:240},phase='idle',start=0,needle=0.5,flight=null,trail=[],score=0,hits=0,tries=0,last=null,dragging=false;
+const box=()=>side==='deuce'?{l:205,r:425,t:165,b:340}:{l:425,r:645,t:165,b:340};
+const serverPosition=()=>({x:side==='deuce'?500:350,y:600});
+function setup(){
+ $('#shots').innerHTML=types.map((s,i)=>`<button class="shot ${i===selected?'active':''}" data-i="${i}" aria-pressed="${i===selected}"><span>${s.n}</span><b>${s.a===0?(s.spin?'↑↑':'↑'):s.a<0?'↗ 10°':'↖ '+s.a+'°'}</b></button>`).join('');
+ document.querySelectorAll('.shot').forEach(b=>b.onclick=()=>{if(phase!=='idle')return;selected=Number(b.dataset.i);setup();});
+}
+function line(x,y,X,Y,color='#d6e7df',width=2){ctx.strokeStyle=color;ctx.lineWidth=width;ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(X,Y);ctx.stroke();}
+function circ(x,y,r,color){ctx.fillStyle=color;ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);ctx.fill();}
+// 地面上の進行方向を、サーバー→実際の着地点の単位ベクトルで定義する。
+// a=0（フラット／スピン）はそのまま延長。その他はそのベクトルを回転する。
+function bounceDirection(s,e,angle){
+ const dx=e.x-s.x,dy=e.y-s.y,length=Math.hypot(dx,dy)||1;
+ const vx=dx/length,vy=dy/length,r=-angle*Math.PI/180;
+ return {x:vx*Math.cos(r)-vy*Math.sin(r),y:vx*Math.sin(r)+vy*Math.cos(r)};
+}
+function pos(t){
+ const f=flight;
+ if(t<=1)return {x:f.s.x+(f.e.x-f.s.x)*t+Math.sin(Math.PI*t)*f.curve,y:f.s.y+(f.e.y-f.s.y)*t,z:Math.sin(Math.PI*t)*100+35*(1-t)};
+ const u=t-1,distance=u*240;
+ return {x:f.e.x+f.direction.x*distance,y:f.e.y+f.direction.y*distance,z:Math.sin(Math.PI*Math.min(u/0.85,1))*(f.type.spin?135:40)};
+}
+function draw(timestamp){
+ ctx.clearRect(0,0,850,690);ctx.fillStyle='#153d3d';ctx.fillRect(150,65,550,550);ctx.fillStyle='#30676a';ctx.fillRect(205,90,440,500);ctx.fillStyle='#387478';ctx.fillRect(205,165,440,350);
+ for(const x of [150,205,645,700])line(x,90,x,590);
+ line(150,90,700,90);line(150,590,700,590);line(205,165,645,165);line(205,515,645,515);line(425,165,425,515);
+ const b=box();ctx.fillStyle='#d0ed8c16';ctx.fillRect(b.l,b.t,b.r-b.l,b.b-b.t);ctx.setLineDash([5,6]);ctx.strokeStyle='#d1ee8b88';ctx.strokeRect(b.l+5,b.t+5,b.r-b.l-10,b.b-b.t-10);ctx.setLineDash([]);
+ line(138,340,712,340,'#101d24',9);line(138,336,712,336,'#e3ebe1',3);for(let x=145;x<710;x+=13)line(x,340,x,352,'#c9e2d339',1);
+ const server=serverPosition();
+ if($('#guide').checked){
+  const s=flight?flight.s:server,e=flight?flight.e:target,d=bounceDirection(s,e,0);
+  ctx.setLineDash([8,8]);line(s.x,s.y,e.x+d.x*260,e.y+d.y*260,'#e4f4c457',1.5);ctx.setLineDash([]);
+ }
+ circ(server.x,server.y,12,'#dce7dc');line(server.x,server.y+11,server.x,server.y+32,'#dce7dc',6);line(server.x,server.y+20,server.x+23,server.y+4,'#c9eb89',4);
+ ctx.strokeStyle='#c9eb89';ctx.lineWidth=3;ctx.beginPath();ctx.ellipse(server.x+29,server.y-5,8,13,-0.4,0,Math.PI*2);ctx.stroke();
+ ctx.strokeStyle='#d1ef8f';ctx.lineWidth=2;for(const r of [1,0.48]){ctx.beginPath();ctx.ellipse(target.x,target.y,25*r,15*r,0,0,Math.PI*2);ctx.stroke();}
+ line(target.x-32,target.y,target.x+32,target.y,'#d1ef8f88',1);line(target.x,target.y-22,target.x,target.y+22,'#d1ef8f88',1);
+ if(last)circ(last.x,last.y,5,last.good?'#d4ef91':'#f7a38f');
+ if(phase==='toss'){
+  needle=(Math.sin((timestamp-start)/340)+1)/2;$('#needle').style.left=needle*100+'%';
+  circ(server.x+20,server.y-40-Math.abs(Math.sin((timestamp-start)/500))*75,6,'#e4f495');
+ }
+ if(flight){
+  const t=(timestamp-flight.start)/flight.duration,p=pos(Math.min(t,1.85));
+  trail.push(p);if(trail.length>65)trail.shift();
+  trail.forEach((q,i)=>circ(q.x,q.y-q.z,2.2,`rgba(215,239,144,${i/trail.length*0.65})`));
+  ctx.fillStyle='#091c2455';ctx.beginPath();ctx.ellipse(p.x,p.y,8,4,0,0,Math.PI*2);ctx.fill();
+  circ(p.x,p.y-p.z,7,flight.type.col);line(p.x-4,p.y-p.z-3,p.x+3,p.y-p.z+4,'#fff9',1);
+  if(t>=1&&!flight.scored){flight.scored=true;result();}
+  if(t>=1.85){flight=null;phase='idle';$('#serve').textContent='もう一球打つ [ Space ]';}
+ }
+ requestAnimationFrame(draw);
+}
+function result(){
+ const landing=flight.e,b=box(),inside=landing.x>=b.l&&landing.x<=b.r&&landing.y>=b.t&&landing.y<=b.b;
+ const distance=Math.hypot(landing.x-flight.target.x,(landing.y-flight.target.y)*1.4),good=inside&&distance<=25;
+ tries++;const points=good?Math.round(100-distance*2):inside?20:0;score+=points;if(good)hits++;last={...landing,good};
+ $('#score').textContent=score;$('#hits').textContent=hits+' / '+tries;
+ $('#msg').textContent=(good?'🎯 ターゲット命中！ +'+points:inside?'✓ サービスイン +20':'フォルト！')+'　'+flight.type.v+' km/h（設定値）';
+}
+function serve(){
+ if(phase==='flight')return;
+ if(phase==='idle'){phase='toss';start=performance.now();needle=0.5;$('#needle').style.left='50%';$('#serve').textContent='インパクト！ [ Space ]';$('#msg').textContent='中央で止めて、ターゲットを狙おう。';return;}
+ const error=(needle-0.5)*2,type=types[selected],s=serverPosition(),e={x:target.x+error*95,y:target.y+Math.abs(error)*55};
+ flight={s,e,target:{...target},curve:type.a*-0.6,type,direction:bounceDirection(s,e,type.a),start:performance.now(),duration:1450*160/type.v,scored:false};
+ trail=[];phase='flight';$('#serve').textContent='サーブ中…';
+}
+$('#serve').onclick=serve;
+document.addEventListener('keydown',event=>{
+ if(event.code!=='Space'||event.repeat)return;
+ const active=document.activeElement;
+ if(['SELECT','INPUT','TEXTAREA','A'].includes(active.tagName)||(active.tagName==='BUTTON'&&active!==$('#serve')))return;
+ event.preventDefault();serve();
+});
+$('#side').onchange=event=>{if(phase!=='idle'){event.target.value=side;return;}side=event.target.value;target.x=850-target.x;last=null;};
+function move(event){
+ if(phase!=='idle')return;
+ const rect=C.getBoundingClientRect(),x=(event.clientX-rect.left)*850/rect.width,y=(event.clientY-rect.top)*690/rect.height,b=box();
+ if(x>=b.l&&x<=b.r&&y>=b.t&&y<=b.b)target={x,y};
+}
+C.onpointerdown=event=>{dragging=true;C.setPointerCapture(event.pointerId);move(event);};C.onpointermove=event=>{if(dragging)move(event);};C.onpointerup=C.onpointercancel=()=>{dragging=false;};
+$('#reset').onclick=()=>{score=hits=tries=0;$('#score').textContent='0';$('#hits').textContent='0 / 0';last=null;flight=null;trail=[];phase='idle';needle=0.5;$('#needle').style.left='50%';$('#serve').textContent='トスを上げる [ Space ]';$('#msg').textContent='スコアをリセットしました。';};
+$('#download').onclick=event=>{
+ event.preventDefault();const blob=new Blob(['<!doctype html>\n'+document.documentElement.outerHTML],{type:'text/html;charset=utf-8'}),link=document.createElement('a'),url=URL.createObjectURL(blob);
+ link.href=url;link.download='index.html';document.body.append(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);
+};
+setup();requestAnimationFrame(draw);
+</script>
+</body>
+</html>
