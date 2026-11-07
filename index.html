@@ -15,7 +15,7 @@
 <header><h1>SERVE LAB ／ 🎾</h1><span id="hand-label">nobichan ／ 右利き</span></header>
 <main>
 <div class="intro"><div><h2>曲げて、跳ねて、狙い撃ち。</h2><p class="muted">ターゲットを置いて、選手ごとのサーブを打ち分けよう。</p></div><div class="stats"><div><strong id="score">0</strong><small>POINTS</small></div><div><strong id="hits">0 / 0</strong><small>TARGET HITS</small></div></div></div>
-<div class="player-picker"><label for="player">🎾 サーバー</label><select id="player"><option value="nobichan">nobichan（右利き・8球種）</option><option value="tt">t.tおやじさん（左利き・3球種）</option></select></div>
+<div class="player-picker"><label for="player">🎾 サーバー</label><select id="player"><option value="nobichan">nobichan（右利き・8球種）</option><option value="tt">t.tおやじさん（左利き・4球種）</option></select></div>
 <div class="layout"><section class="play-area" aria-label="コートとサーブ操作">
 <div class="court"><div class="badge">● 青いリターナー／点線内のターゲットをドラッグ</div><canvas id="c" width="850" height="690" tabindex="0" aria-label="青いリターナーはドラッグで移動できます。矢印キーでも移動。相手側サービスボックスにターゲットを設置できます"></canvas></div>
 <div class="serve-controls"><p style="font-size:12px;color:#acbfc2">中央の明るいゾーンでインパクト！</p><div class="meter"><i class="needle" id="needle"></i></div><button id="serve">トスを上げる [ Space ]</button><div id="msg" role="status" aria-live="polite">青いリターナーをドラッグで自由に移動できます。</div></div>
@@ -45,7 +45,8 @@ const profiles={
  tt:{name:'t.tおやじさん',hand:-1,side:'ad',skills:'アドサイド・ワイドのスライスサーブ。\nそのあと、アドサイド・センターに高速フラットサーブ。',types:[
   {n:'高速フラット',a:0,v:215,col:'#edaa9d',fast:true},
   {n:'高速スライス',a:45,v:190,col:'#e5c37f',fast:true},
-  {n:'スピン',a:0,v:140,col:'#a8ded8',spin:true}
+  {n:'スピン',a:0,v:140,col:'#a8ded8',spin:true},
+  {n:'キックサーブ',a:-10,v:155,col:'#bca9e6',spin:true}
  ]}
 };
 const initialReceiver = {x:300,y:110};
